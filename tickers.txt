@@ -1,0 +1,11 @@
+# List of tickers, one per line. Lines starting with # are ignored.
+JPM
+CVX
+MRK
+WMT
+RACE
+DIS
+STM
+GOOGL
+SEA
+AMZN

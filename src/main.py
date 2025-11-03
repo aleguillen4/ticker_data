@@ -2,7 +2,8 @@
 
 import argparse
 import logging
-from src.data_fetcher import get_stock_fundamentals
+#from src.data_fetcher import get_stock_fundamentals
+from src.data_fetcher import get_annual_fundamentals
 from src.file_writer import save_to_csv
 from src.utils import setup_logging
 
@@ -15,7 +16,7 @@ def run_pipeline(ticker: str):
     logging.info(f"Iniciando proceso para el ticker: {ticker.upper()}...")
     
     # 1. Obtener datos
-    data_df = get_stock_fundamentals(ticker)
+    data_df = get_annual_fundamentals(ticker)
     
     # 2. Guardar datos
     if data_df is not None and not data_df.empty:
@@ -39,17 +40,42 @@ def main():
         description="Cliente de Yahoo Finance para extraer datos fundamentales."
     )
     
-    # Argumento posicional, es obligatorio
+    # Argumento posicional opcional (si no se pasa, se puede usar --tickers-file)
     parser.add_argument(
-        "ticker", 
-        type=str, 
-        help="El símbolo del ticker a consultar (ej: AAPL, MSFT, GOOGL)."
+        "ticker",
+        type=str,
+        nargs='?',
+        help="El símbolo del ticker a consultar (ej: AAPL, MSFT, GOOGL). Si se omite, use --tickers-file."
+    )
+
+    parser.add_argument(
+        "--tickers-file",
+        dest="tickers_file",
+        type=str,
+        help="Ruta a un archivo de texto con una lista de tickers (uno por línea). Ejemplo: tickers.txt"
     )
     
     args = parser.parse_args()
     
     # Ejecutar el pipeline
-    run_pipeline(args.ticker)
+    if args.tickers_file:
+        try:
+            with open(args.tickers_file, 'r', encoding='utf-8') as f:
+                lines = [ln.strip() for ln in f.readlines()]
+            tickers = [ln for ln in lines if ln and not ln.startswith('#')]
+            if not tickers:
+                logging.error(f"El archivo {args.tickers_file} no contiene tickers válidos.")
+                return
+            for t in tickers:
+                run_pipeline(t)
+        except FileNotFoundError:
+            logging.error(f"Archivo de tickers no encontrado: {args.tickers_file}")
+        except Exception as e:
+            logging.exception(f"Error leyendo el archivo de tickers: {e}")
+    elif args.ticker:
+        run_pipeline(args.ticker)
+    else:
+        logging.error("Debe pasar un ticker como argumento o usar --tickers-file <archivo> con la lista de tickers.")
 
 if __name__ == "__main__":
     # Esto permite que el script sea ejecutado directamente
