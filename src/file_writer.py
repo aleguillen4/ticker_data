@@ -97,7 +97,7 @@ def save_to_csv(df: pd.DataFrame, ticker: str):
 
                 # Define rep metrics but expand dividends into two rows: 'dividends' and 'splits'
                 rep_metrics = [
-                    'marketCap', 'beta', 'peRatio', 'forwardDividendRate', 'EPS', '52WeekRange',
+                    'marketCap', 'beta', 'peRatio', 'forwardDividendYield', 'EPS', '52WeekRange',
                     'trailingPE', 'forwardPE', 'profitMargin', 'payoutRatio', 'ROE'
                 ]
 
@@ -112,9 +112,9 @@ def save_to_csv(df: pd.DataFrame, ticker: str):
                                 out = _format_number_for_human(val, scale='M')
                             elif m in ('operatingExpense', 'netIncome'):
                                 out = _format_number_for_human(val, scale='M')
-                            elif m in ('profitMargin', 'ROE', 'payoutRatio'):
+                            elif m in ('profitMargin', 'ROE', 'payoutRatio', 'forwardDividendYield'):
                                 out = _format_percent(val)
-                            elif m in ('EPS', 'trailingPE', 'forwardPE', 'beta', 'peRatio', 'forwardDividendRate'):
+                            elif m in ('EPS', 'trailingPE', 'forwardPE', 'beta', 'peRatio'):
                                 out = _format_number_for_human(val, scale=None)
                             elif m == '52WeekRange':
                                 out = _format_52week_range(val)
@@ -157,13 +157,15 @@ def save_to_csv(df: pd.DataFrame, ticker: str):
                 # Financials
                 writer.writerow([])
                 writer.writerow(['financials'] + cols_order)
-                fin_metrics = ['totalRevenue', 'costOfRevenue', 'operatingExpense', 'netIncome']
+                fin_metrics = ['totalRevenue', 'totalRevenueChange', 'costOfRevenue', 'operatingExpense', 'netIncome', 'EBITDA', 'net debts over EBITDA']
                 for m in fin_metrics:
                     row = [m]
                     for c in cols_order:
                         val = df.at[m, c] if m in df.index else None
-                        if human_readable and m in ('totalRevenue', 'costOfRevenue', 'operatingExpense', 'netIncome'):
+                        if human_readable and m in ('totalRevenue', 'costOfRevenue', 'operatingExpense', 'netIncome', 'EBITDA'):
                             out = _format_number_for_human(val, scale='M')
+                        elif human_readable and m in ('totalRevenueChange', 'net debts over EBITDA',):
+                            out = _format_percent(val)
                         else:
                             out = '' if pd.isna(val) else val
                         row.append(out)
@@ -174,13 +176,13 @@ def save_to_csv(df: pd.DataFrame, ticker: str):
                 writer.writerow(['balance sheets'] + cols_order)
                 bs_metrics = [
                     'cash cash equivalence', 'total assets', 'total liabilities', 'working capital',
-                    'invested capital', 'total debts', 'ordinary shared number', 'net tangible assets'
+                    'invested capital', 'net debts', 'ordinary shared number', 'net tangible assets'
                 ]
                 for m in bs_metrics:
                     row = [m]
                     for c in cols_order:
                         val = df.at[m, c] if m in df.index else None
-                        if human_readable and m in ('cash cash equivalence', 'total assets', 'invested capital', 'total debts', 'net tangible assets', 'total liabilities'):
+                        if human_readable and m in ('cash cash equivalence', 'total assets', 'invested capital', 'net debts', 'net tangible assets', 'total liabilities', 'working capital'):
                             out = _format_number_for_human(val, scale='M')
                         else:
                             out = '' if pd.isna(val) else val

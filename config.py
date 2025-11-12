@@ -11,7 +11,7 @@ CSV_ROW_NAMES = [
     'marketCap',
     'beta',
     'peRatio',
-    'forwardDividendRate',
+    'forwardDividendYield',
     'EPS',
     '52WeekRange',
     'trailingPE',
@@ -22,16 +22,19 @@ CSV_ROW_NAMES = [
     'ROE',
     # Financials subsection
     'totalRevenue',
+    'totalRevenueChange',
     'costOfRevenue',
     'operatingExpense',
     'netIncome',
+    'EBITDA',
     # Balance sheets subsection
     'cash cash equivalence',
     'total assets',
     'total liabilities',
     'working capital',
     'invested capital',
-    'total debts',
+    'net debts',
+    'net debts over EBITDA',
     'ordinary shared number',
     'net tangible assets'
 ]

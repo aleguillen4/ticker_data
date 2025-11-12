@@ -195,6 +195,7 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
 
         # --- Total Revenue y Cost of Revenue por año ---
         total_rev = {}
+        total_rev_inc = {}
         cost_rev = {}
         for date in (income_statement.columns if isinstance(income_statement, pd.DataFrame) else []):
             year = _col_year(date)
@@ -205,12 +206,19 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
                 cr = get_value_candidates_normalized(income_statement, ['Cost Of Revenue', 'Cost of Revenue', 'costOfRevenue', 'CostOfRevenue'], date)
                 total_rev[year] = tr
                 cost_rev[year] = cr
+
+        for year, tr in total_rev.items():
+            if last_tr := total_rev.get(year - 1):
+                total_rev_inc[year] = tr / last_tr - 1.0
+
         result_df.loc['totalRevenue'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **total_rev, 'actual': current_info.get('totalRevenue')})
+        result_df.loc['totalRevenueChange'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **total_rev_inc, 'actual': None})
         result_df.loc['costOfRevenue'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **cost_rev, 'actual': None})
 
         # --- Operating expense y Net Income por año ---
         operating_exp = {}
         net_income_vals = {}
+        ebitda_vals = {}
         for date in (income_statement.columns if isinstance(income_statement, pd.DataFrame) else []):
             year = _col_year(date)
             if year is None:
@@ -218,10 +226,14 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
             if year in YEARS_TO_EXTRACT:
                 op = get_value_candidates_normalized(income_statement, ['Operating Expense', 'Operating Expenses', 'OperatingIncome', 'Operating Income', 'operatingExpense', 'operatingExpenses'], date)
                 ni = get_value_candidates_normalized(income_statement, ['Net Income', 'NetIncome', 'netIncome', 'Net Income Applicable To Common Shares', 'NetIncomeLoss'], date)
+                ebitda = get_value_candidates_normalized(income_statement, ['EBITDA', 'EBIDTA', 'ebitda', 'ebitdta'], date)
+
                 operating_exp[year] = op
                 net_income_vals[year] = ni
+                ebitda_vals[year] = ebitda
         result_df.loc['operatingExpense'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **operating_exp, 'actual': current_info.get('operatingMargins')})
         result_df.loc['netIncome'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **net_income_vals, 'actual': current_info.get('netIncomeToCommon') or current_info.get('netIncome')})
+        result_df.loc['EBITDA'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **ebitda_vals, 'actual': current_info.get('EBITDA') or current_info.get('EBITDA')})
 
         # --- ROE por año (usa calculate_roe) ---
         roe_data = calculate_roe(income_statement if income_statement is not None else pd.DataFrame(),
@@ -258,7 +270,7 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
                     divsplit[year] = {'dividends': float(total_div) if total_div != 0 else None, 'splits': split_events if split_events else None}
                 else:
                     divsplit[year] = None
-        last_div = current_info.get('lastDividendValue') or current_info.get('dividendRate') or current_info.get('forwardDividendRate')
+        last_div = current_info.get('lastDividendValue') or current_info.get('dividendRate') or current_info.get('forwardDividendYield')
         last_split = current_info.get('lastSplitFactor') or current_info.get('lastSplitDate')
         result_df.loc['dividend_and_split'] = pd.Series({**{y: None for y in YEARS_TO_EXTRACT}, **{y: divsplit.get(y) for y in YEARS_TO_EXTRACT}, 'actual': {'lastDividend': last_div, 'lastSplit': last_split}})
 
@@ -317,7 +329,7 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
         result_df.loc['peRatio'] = pd.Series({'actual': current_info.get('trailingPE'), **{y: None for y in YEARS_TO_EXTRACT}})
         result_df.loc['trailingPE'] = pd.Series({'actual': current_info.get('trailingPE'), **{y: None for y in YEARS_TO_EXTRACT}})
         result_df.loc['forwardPE'] = pd.Series({'actual': current_info.get('forwardPE'), **{y: None for y in YEARS_TO_EXTRACT}})
-        result_df.loc['forwardDividendRate'] = pd.Series({'actual': current_info.get('forwardDividendRate') or current_info.get('dividendRate'), **{y: None for y in YEARS_TO_EXTRACT}})
+        result_df.loc['forwardDividendYield'] = pd.Series({'actual': (current_info.get('forwardDividendYield') or current_info.get('dividendRate')) / current_price, **{y: None for y in YEARS_TO_EXTRACT}})
         f52_low = current_info.get('fiftyTwoWeekLow')
         f52_high = current_info.get('fiftyTwoWeekHigh')
         # Compute per-year high/low using price_hist (similar to the example provided)
@@ -356,7 +368,8 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
         goodwill = {}
         long_term_debt = {}
         short_term_debt = {}
-        total_debts = {}
+        net_debts = {}
+        net_debts_over_ebitda = {}
         ordinary_shares = {}
         net_tangible_assets = {}
         working_cap = {}
@@ -376,6 +389,12 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
             gw = safe_bs_get(date, ['Goodwill', 'goodWill'])
             ltd = safe_bs_get(date, ['Long Term Debt', 'Long-term Debt', 'longTermDebt'])
             std = safe_bs_get(date, ['Short Long Term Debt', 'Short Term Debt', 'Short-term Debt', 'shortTermDebt'])
+            wc = safe_bs_get(date, ['Working Capital'])
+            nd = safe_bs_get(date, ['Net Debt'])
+            if ebitda := ebitda_vals.get(year):
+                nd_over_ebitda = nd / ebitda
+            else:
+                nd_over_ebitda = None
             # ordinary shares may be in income_statement/financials as 'Basic Average Shares' etc.
             ord_sh = None
             try:
@@ -393,21 +412,9 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
             long_term_debt[year] = ltd
             short_term_debt[year] = std
             ordinary_shares[year] = ord_sh
-
-            # total debts: sum available debt pieces
-            td = None
-            try:
-                parts = [x for x in (ltd, std) if x is not None]
-                td = sum(parts) if parts else None
-            except Exception:
-                td = None
-            total_debts[year] = td
-
-            # working capital: total current assets - total current liabilities
-            if tca is not None and tcl is not None:
-                working_cap[year] = tca - tcl
-            else:
-                working_cap[year] = None
+            working_cap[year] = wc
+            net_debts[year] = nd
+            net_debts_over_ebitda[year] = nd_over_ebitda
 
             # invested capital: simple proxy = total assets - total current liabilities - cash
             if ta is not None:
@@ -433,7 +440,8 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
         total_liabilities['actual'] = None
         working_cap['actual'] = None
         invested_cap['actual'] = None
-        total_debts['actual'] = None
+        net_debts['actual'] = None
+        net_debts_over_ebitda['actual'] = None # ??? TODO
         net_tangible_assets['actual'] = None
 
         # Insert rows with display names matching the user's requested CSV labels
@@ -442,7 +450,8 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
         result_df.loc['total liabilities'] = pd.Series(total_liabilities)
         result_df.loc['working capital'] = pd.Series(working_cap)
         result_df.loc['invested capital'] = pd.Series(invested_cap)
-        result_df.loc['total debts'] = pd.Series(total_debts)
+        result_df.loc['net debts'] = pd.Series(net_debts)
+        result_df.loc['net debts over EBITDA'] = pd.Series(net_debts_over_ebitda)
         result_df.loc['ordinary shared number'] = pd.Series(ordinary_shares)
         result_df.loc['net tangible assets'] = pd.Series(net_tangible_assets)
 
