@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from config import OUTPUT_DIRECTORY, YEARS_TO_EXTRACT
 
-def save_to_csv(df: pd.DataFrame, ticker: str):
+def save_to_csv(df: pd.DataFrame, ticker: str, *, red_cells, green_cells):
     """
     Guarda el DataFrame en un archivo CSV en el directorio de salida.
     """
@@ -198,6 +198,28 @@ def save_to_csv(df: pd.DataFrame, ticker: str):
         readable_path = filepath.replace('.csv', '_readable.csv')
         _write_grouped_csv(readable_path, human_readable=True)
         logging.info(f"Archivo readable guardado exitosamente en: {readable_path}")
+
+        readable_xlsx_path = readable_path.replace('.csv', '.xlsx')
+        writer = pd.ExcelWriter(readable_xlsx_path, engine='xlsxwriter')
+
+        pd.read_csv(readable_path).to_excel(writer, sheet_name='Sheet1', engine='xlsxwriter')
+
+        workbook = writer.book
+        worksheet = writer.sheets['Sheet1']
+
+        red   = workbook.add_format({'bg_color':   '#FF0000',
+                                     'font_color': '#000000'})
+        green = workbook.add_format({'bg_color':   '#00FF00',
+                                     'font_color': '#000000'})
+
+        for row, col in red_cells:
+            worksheet.write(row, col, str(worksheet.table[row][col][0]), red)
+
+        for row, col in green_cells:
+            worksheet.write(row, col, str(worksheet.table[row][col][0]), green)
+
+        writer.close()
+
         return raw_path, readable_path
 
     except Exception as e:

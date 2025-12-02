@@ -16,7 +16,7 @@ def run_pipeline(ticker: str):
     logging.info(f"Iniciando proceso para el ticker: {ticker.upper()}...")
     
     # 1. Obtener datos
-    data_df = get_annual_fundamentals(ticker)
+    data_df, red_cells, green_cells = get_annual_fundamentals(ticker)
     
     # 2. Guardar datos
     if data_df is not None and not data_df.empty:
@@ -24,7 +24,7 @@ def run_pipeline(ticker: str):
         # Imprime el DataFrame como un string limpio
         logging.info("\n" + data_df.to_string(index=False))
         
-        save_to_csv(data_df, ticker)
+        save_to_csv(data_df, ticker, red_cells=red_cells, green_cells=green_cells)
         logging.info(f"Proceso completado para {ticker.upper()}.")
     else:
         logging.warning(f"No se generó ningún archivo CSV para {ticker.upper()} debido a errores previos.")

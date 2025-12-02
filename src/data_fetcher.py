@@ -148,7 +148,7 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
 
         if (income_statement is None or income_statement.empty) and (price_hist is None or price_hist.empty):
             logging.error(f"Datos históricos incompletos para {ticker_symbol}.")
-            return None
+            return None, None, None
 
         # Pre-create columns for each requested year plus 'actual' so row assignments work consistently
         cols_order = YEARS_TO_EXTRACT + ['actual']
@@ -470,7 +470,7 @@ def get_annual_fundamentals(ticker_symbol: str) -> pd.DataFrame:
         result_df.insert(1, 'as_of', pd.Series([as_of_value] * len(result_df), index=result_df.index))
         result_df.insert(2, 'code/year', result_df.index)
 
-        return result_df
+        return result_df, [], []
 
     except Exception as e:
         # Use logging.exception to include traceback for debugging purposes
